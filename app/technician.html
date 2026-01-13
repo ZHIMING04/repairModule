@@ -162,14 +162,7 @@
             // Update Ticket Status
             const ticketSuccess = await patchData('RepairLogs', ticketId, { ticket_status: newStatus });
 
-            if (ticketSuccess && assetId) {
-                // Update Asset Status too to keep them in sync
-                let assetStatus = 'Available';
-                if (newStatus === 'In Progress') assetStatus = 'Under Repair';
-                if (newStatus === 'Unrepairable') assetStatus = 'Disposed';
 
-                await patchData('Assets', assetId, { status: assetStatus });
-            }
 
             loadTickets(); // Refresh UI
         }

@@ -24,18 +24,6 @@ module.exports = cds.service.impl(async function () {
     this.after('UPDATE', 'RepairLogs', async (data) => {
         // data might only contain modified fields, so we check if ticket_status is present
         if (data.ticket_status) {
-
-            // 1. Try to get asset_ID from payload
-            let assetId = data.asset_ID;
-
-            // 2. If missing, fetch from DB using the Ticket ID
-            if (!assetId) {
-                const log = await SELECT.one.from(RepairLogs).where({ ID: data.ID });
-                if (log) {
-                    assetId = log.asset_ID;
-                }
-            }
-
             if (assetId) {
                 let newAssetStatus = null;
 
@@ -52,8 +40,6 @@ module.exports = cds.service.impl(async function () {
                     console.log(`[Auto-Resolve] Ticket ${data.ID} became ${data.ticket_status}. Updating Asset ${assetId} to ${newAssetStatus}.`);
                     await UPDATE(Assets).set({ status: newAssetStatus }).where({ ID: assetId });
                 }
-            } else {
-                console.error(`[Auto-Resolve] Could not find Asset ID for Ticket ${data.ID}`);
             }
         }
     });
