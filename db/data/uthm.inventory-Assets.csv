@@ -1,0 +1,4 @@
+ID;name;serial_number;location;status;purchase_date
+e448374d-176b-4e6f-b461-123456789012;Dell Latitude 5420;DL-5420-001;IT Dept;Available;2023-01-15
+e448374d-176b-4e6f-b461-123456789013;Projector Sony;PRJ-SNY-002;Room 101;Under Repair;2022-05-20
+e448374d-176b-4e6f-b461-123456789014;Office Chair;CHR-099;Admin Office;Available;2023-08-01

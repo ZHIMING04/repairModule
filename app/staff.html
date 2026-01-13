@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Portal - UTHM Inventory</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-logo">
+            <i class="fas fa-boxes"></i> UTHM Inventory <span class="module-badge">Repair Module</span>
+        </div>
+        <nav class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="staff.html" style="color: white; font-weight: bold;">Staff Portal</a>
+            <a href="technician.html">Technician Dashboard</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h2>Staff Portal</h2>
+            <button class="btn btn-primary" onclick="showReportForm()"><i class="fas fa-plus"></i> Report Issue</button>
+        </div>
+
+        <!-- LIST VIEW -->
+        <div id="view-list">
+            <div class="table-container">
+                <table id="my-reports-table">
+                    <thead>
+                        <tr>
+                            <th>Asset</th>
+                            <th>Issue</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="4" style="text-align: center;">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- REPORT FORM VIEW (Hidden by default) -->
+        <div id="view-form" style="display: none;">
+            <a href="#" onclick="showListView()" class="btn-link"
+                style="display: inline-block; margin-bottom: 1rem;">&larr; Back to Reports</a>
+
+            <div class="card" style="width: 100%; max-width: 800px; margin: 0 auto; text-align: left;">
+                <h3 style="margin-top: 0;"><i class="fas fa-file-alt" style="color: #dc3545;"></i> Submit Defect Report
+                </h3>
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 1rem 0;">
+
+                <form id="reportForm" onsubmit="submitReport(event)">
+                    <div class="form-group">
+                        <label class="form-label">Asset</label>
+                        <div style="display: flex; gap: 10px;">
+                            <select id="assetSelect" class="form-control" required>
+                                <option value="">-- Select Asset manually --</option>
+                            </select>
+                            <button type="button" class="btn btn-primary" style="background: #ffc107; color: #000;"><i
+                                    class="fas fa-qrcode"></i> Scan QR</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Description of Issue</label>
+                        <textarea id="issueDesc" class="form-control" rows="4"
+                            placeholder="Describe the problem in detail..." required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Photo Evidence</label>
+                        <div
+                            style="border: 2px dashed #ccc; padding: 2rem; text-align: center; border-radius: 8px; color: #999;">
+                            <i class="fas fa-camera" style="font-size: 2rem; margin-bottom: 10px;"></i><br>
+                            Click to upload or drag and drop
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Submit Defect Report</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/script.js"></script>
+    <script>
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            loadReports();
+            loadAssets();
+        });
+
+        // Toggle Views
+        function showReportForm() {
+            document.getElementById('view-list').style.display = 'none';
+            document.getElementById('view-form').style.display = 'block';
+        }
+
+        function showListView() {
+            document.getElementById('view-form').style.display = 'none';
+            document.getElementById('view-list').style.display = 'block';
+            loadReports(); // Refresh
+        }
+
+        // Load Assets for Dropdown
+        async function loadAssets() {
+            const assets = await getData('Assets');
+            const select = document.getElementById('assetSelect');
+            assets.forEach(asset => {
+                const opt = document.createElement('option');
+                opt.value = asset.ID;
+                opt.textContent = `${asset.name} (${asset.serial_number})`;
+                select.appendChild(opt);
+            });
+        }
+
+        // Load My Reports (Currently all logs for demo)
+        async function loadReports() {
+            // Expand Asset to get name
+            const response = await fetch('/odata/v4/repair/RepairLogs?$expand=asset');
+            const data = await response.json();
+            const logs = data.value || [];
+
+            const tbody = document.querySelector('#my-reports-table tbody');
+            tbody.innerHTML = '';
+
+            logs.forEach(log => {
+                const row = `
+                    <tr>
+                        <td><strong>${log.asset ? log.asset.name : 'Unknown Asset'}</strong></td>
+                        <td>${log.description}</td>
+                        <td>${formatDate(log.createdAt)}</td>
+                        <td>${getStatusBadge(log.ticket_status)}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No reports found.</td></tr>';
+            }
+        }
+
+        // Submit Form
+        async function submitReport(e) {
+            e.preventDefault();
+            const assetId = document.getElementById('assetSelect').value;
+            const desc = document.getElementById('issueDesc').value;
+
+            const payload = {
+                asset_ID: assetId,
+                description: desc,
+                reporter_id: "USER_001", // Mock User
+                ticket_status: "Pending"
+            };
+
+            const result = await postData('RepairLogs', payload);
+            if (result) {
+                alert('Report submitted successfully!');
+                document.getElementById('reportForm').reset();
+                showListView();
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Technician Dashboard - UTHM Inventory</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-logo">
+            <i class="fas fa-boxes"></i> UTHM Inventory <span class="module-badge">Repair Module</span>
+        </div>
+        <nav class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="staff.html">Staff Portal</a>
+            <a href="technician.html" style="color: white; font-weight: bold;">Technician Dashboard</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h2>Repair Queue</h2>
+            <button class="btn btn-primary" onclick="alert('Open Manual Ticket Form')"><i class="fas fa-plus"></i>
+                Manual Ticket</button>
+        </div>
+
+        <!-- Widgets -->
+        <div class="dashboard-stats">
+            <div class="stat-card pending">
+                <div>
+                    <div class="stat-value" id="count-pending">0</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+                <i class="fas fa-clock" style="color: var(--warning-color); font-size: 1.5rem;"></i>
+            </div>
+            <div class="stat-card progress">
+                <div>
+                    <div class="stat-value" id="count-progress">0</div>
+                    <div class="stat-label">In Progress</div>
+                </div>
+                <i class="fas fa-tools" style="color: var(--info-color); font-size: 1.5rem;"></i>
+            </div>
+            <div class="stat-card fixed">
+                <div>
+                    <div class="stat-value" id="count-fixed">0</div>
+                    <div class="stat-label">Fixed</div>
+                </div>
+                <i class="fas fa-check-circle" style="color: var(--success-color); font-size: 1.5rem;"></i>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div style="margin-bottom: 1rem;">
+            <button class="btn btn-primary" style="border-radius: 20px; padding: 5px 15px;">All</button>
+            <button class="btn btn-link">Pending</button>
+            <button class="btn btn-link">In Progress</button>
+            <button class="btn btn-link">Fixed</button>
+        </div>
+
+        <!-- Ticket Table -->
+        <div class="table-container">
+            <table id="tickets-table">
+                <thead>
+                    <tr>
+                        <th>Ticket ID</th>
+                        <th>Asset</th>
+                        <th>Reported By</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="6" style="text-align: center;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTickets();
+        });
+
+        async function loadTickets() {
+            // Expand Asset
+            const response = await fetch('/odata/v4/repair/RepairLogs?$expand=asset&$orderby=createdAt desc');
+            const data = await response.json();
+            const logs = data.value || [];
+
+            updateStats(logs);
+            renderTable(logs);
+        }
+
+        function updateStats(logs) {
+            const pending = logs.filter(l => l.ticket_status === 'Pending').length;
+            const progress = logs.filter(l => l.ticket_status === 'In Progress' || l.ticket_status === 'Under Repair').length;
+            const fixed = logs.filter(l => l.ticket_status === 'Fixed').length;
+
+            document.getElementById('count-pending').textContent = pending;
+            document.getElementById('count-progress').textContent = progress;
+            document.getElementById('count-fixed').textContent = fixed;
+        }
+
+        function renderTable(logs) {
+            const tbody = document.querySelector('#tickets-table tbody');
+            tbody.innerHTML = '';
+
+            logs.forEach(log => {
+                const row = `
+                    <tr>
+                        <td style="color: #888;">#${log.ID.substring(0, 5)}</td>
+                        <td>
+                            <strong>${log.asset ? log.asset.name : 'Unknown'}</strong><br>
+                            <span style="font-size:0.8rem; color:#666;">${log.asset ? log.asset.location : '-'}</span>
+                        </td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap:8px;">
+                                <div style="background:#e9ecef; width:24px; height:24px; border-radius:50%; text-align:center; line-height:24px; font-weight:bold; font-size:0.8rem;">
+                                    ${log.reporter_id ? log.reporter_id.charAt(0) : 'U'}
+                                </div>
+                                ${log.reporter_id || 'Anonymous'}
+                            </div>
+                        </td>
+                        <td>${formatDate(log.createdAt)}</td>
+                        <td>${getStatusBadge(log.ticket_status)}</td>
+                        <td>${renderActions(log)}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No tickets found.</td></tr>';
+            }
+        }
+
+        function renderActions(log) {
+            if (log.ticket_status === 'Pending') {
+                return `<button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="updateStatus('${log.ID}', 'In Progress', '${log.asset_ID}')">Start Repair</button>`;
+            }
+            if (log.ticket_status === 'In Progress' || log.ticket_status === 'Under Repair') {
+                return `
+                    <button class="btn" style="padding: 4px 8px; font-size: 0.8rem; background: var(--success-color); color: white;" onclick="updateStatus('${log.ID}', 'Fixed', '${log.asset_ID}')">Fixed</button>
+                    <button class="btn" style="padding: 4px 8px; font-size: 0.8rem; background: var(--danger-color); color: white;" onclick="updateStatus('${log.ID}', 'Unrepairable', '${log.asset_ID}')">Disposal</button>
+                `;
+            }
+            return '<span style="color:#aaa; font-size: 0.9rem;">Completed</span>';
+        }
+
+        async function updateStatus(ticketId, newStatus, assetId) {
+            if (!confirm(`Update ticket to ${newStatus}?`)) return;
+
+            // Update Ticket Status
+            const ticketSuccess = await patchData('RepairLogs', ticketId, { ticket_status: newStatus });
+
+            if (ticketSuccess && assetId) {
+                // Update Asset Status too to keep them in sync
+                let assetStatus = 'Available';
+                if (newStatus === 'In Progress') assetStatus = 'Under Repair';
+                if (newStatus === 'Unrepairable') assetStatus = 'Disposed';
+
+                await patchData('Assets', assetId, { status: assetStatus });
+            }
+
+            loadTickets(); // Refresh UI
+        }
+    </script>
+</body>
+
+</html>
