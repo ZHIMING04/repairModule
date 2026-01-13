@@ -24,6 +24,21 @@ module.exports = cds.service.impl(async function () {
     this.after('UPDATE', 'RepairLogs', async (data) => {
         // data might only contain modified fields, so we check if ticket_status is present
         if (data.ticket_status) {
+
+            // 1. Try to get asset_ID from payload
+            let assetId = data.asset_ID;
+
+            // 2. If missing, fetch from DB using the Ticket ID
+            if (!assetId) {
+                // Warning: 'this.entities' might not be available in all scopes, better to use string name or global entities if needed, 
+                // but usually fine within service impl.
+                // However, for safety in CAP events, better to query by string name if entities object is tricky, but 'RepairLogs' string works.
+                const log = await SELECT.one.from(RepairLogs).where({ ID: data.ID });
+                if (log) {
+                    assetId = log.asset_ID;
+                }
+            }
+
             if (assetId) {
                 let newAssetStatus = null;
 
@@ -32,7 +47,6 @@ module.exports = cds.service.impl(async function () {
                 } else if (data.ticket_status === 'Unrepairable') {
                     newAssetStatus = 'Disposed';
                 } else if (data.ticket_status === 'In Progress') {
-                    // reinforcing status just in case
                     newAssetStatus = 'Under Repair';
                 }
 
@@ -40,6 +54,8 @@ module.exports = cds.service.impl(async function () {
                     console.log(`[Auto-Resolve] Ticket ${data.ID} became ${data.ticket_status}. Updating Asset ${assetId} to ${newAssetStatus}.`);
                     await UPDATE(Assets).set({ status: newAssetStatus }).where({ ID: assetId });
                 }
+            } else {
+                console.log(`[Auto-Resolve] Warning: Could not find Asset ID for Ticket ${data.ID}`);
             }
         }
     });
