@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asset Stock - UTHM Inventory</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-logo">
+            <i class="fas fa-boxes"></i> UTHM Inventory <span class="module-badge">Repair Module</span>
+        </div>
+        <nav class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="assets.html" style="color: white; font-weight: bold;">Assets</a>
+            <a href="staff.html">Staff Portal</a>
+            <a href="technician.html">Technician Dashboard</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <h2>Asset Stock Management</h2>
+
+        <div class="dashboard-stats">
+            <div class="stat-card fixed">
+                <div>
+                    <div class="stat-value" id="count-available">0</div>
+                    <div class="stat-label">Available</div>
+                </div>
+                <i class="fas fa-box" style="color: var(--success-color); font-size: 1.5rem;"></i>
+            </div>
+            <div class="stat-card pending">
+                <div>
+                    <div class="stat-value" id="count-repair">0</div>
+                    <div class="stat-label">Under Repair</div>
+                </div>
+                <i class="fas fa-tools" style="color: var(--warning-color); font-size: 1.5rem;"></i>
+            </div>
+            <div class="stat-card progress">
+                <div>
+                    <div class="stat-value" id="count-disposed">0</div>
+                    <div class="stat-label">Disposed</div>
+                </div>
+                <i class="fas fa-trash" style="color: var(--danger-color); font-size: 1.5rem;"></i>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="assets-table">
+                <thead>
+                    <tr>
+                        <th>Asset Name</th>
+                        <th>Serial Number</th>
+                        <th>Location</th>
+                        <th>Purchase Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" style="text-align: center;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAssets();
+        });
+
+        async function loadAssets() {
+            const assets = await getData('Assets?$orderby=name asc');
+
+            // Stats
+            document.getElementById('count-available').textContent = assets.filter(a => a.status === 'Available').length;
+            document.getElementById('count-repair').textContent = assets.filter(a => a.status === 'Under Repair').length;
+            document.getElementById('count-disposed').textContent = assets.filter(a => a.status === 'Disposed').length;
+
+            const tbody = document.querySelector('#assets-table tbody');
+            tbody.innerHTML = '';
+
+            assets.forEach(asset => {
+                const row = `
+                    <tr>
+                        <td><strong>${asset.name}</strong></td>
+                        <td>${asset.serial_number}</td>
+                        <td>${asset.location}</td>
+                        <td>${formatDate(asset.purchase_date)}</td>
+                        <td>${getStatusBadge(asset.status)}</td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+
+            if (assets.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No assets found.</td></tr>';
+            }
+        }
+    </script>
+</body>
+
+</html>
