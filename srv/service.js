@@ -24,12 +24,6 @@ module.exports = cds.service.impl(async function () {
     this.after('UPDATE', 'RepairLogs', async (data) => {
         // data might only contain modified fields, so we check if ticket_status is present
         if (data.ticket_status) {
-            const assetId = data.asset_ID;
-
-            // If asset_ID is not in the payload, we might need to fetch it (but usually it's there or we can safely ignore if not needed contextually)
-            // Ideally we should ensure we have the assetID. For this demo, let's assume it's passed or we'd need a before handler to fetch it.
-            // However, the standard CAP update usually returns the entity.
-
             if (assetId) {
                 let newAssetStatus = null;
 

@@ -7,6 +7,8 @@
     <title>Staff Portal - UTHM Inventory</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- QR Code Library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 
 <body>
@@ -16,6 +18,7 @@
         </div>
         <nav class="nav-links">
             <a href="index.html">Home</a>
+            <a href="assets.html">Assets</a>
             <a href="staff.html" style="color: white; font-weight: bold;">Staff Portal</a>
             <a href="technician.html">Technician Dashboard</a>
         </nav>
@@ -65,8 +68,8 @@
                             <select id="assetSelect" class="form-control" required>
                                 <option value="">-- Select Asset manually --</option>
                             </select>
-                            <button type="button" class="btn btn-primary" style="background: #ffc107; color: #000;"><i
-                                    class="fas fa-qrcode"></i> Scan QR</button>
+                            <button type="button" class="btn btn-primary" style="background: #ffc107; color: #000;"
+                                onclick="startQrScanner()"><i class="fas fa-qrcode"></i> Scan QR</button>
                         </div>
                     </div>
 
@@ -82,7 +85,13 @@
                             style="border: 2px dashed #ccc; padding: 2rem; text-align: center; border-radius: 8px; color: #999;">
                             <i class="fas fa-camera" style="font-size: 2rem; margin-bottom: 10px;"></i><br>
                             Click to upload or drag and drop
+                            <input type="file" id="damagePhotoInput" accept="image/*"
+                                style="opacity: 0; position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;"
+                                onchange="handleImageUpload(this)">
                         </div>
+                        <p id="fileName"
+                            style="text-align: center; margin-top: 0.5rem; font-size: 0.9rem; color: #333;"></p>
+                        <input type="hidden" id="damagePhotoBase64">
                     </div>
 
                     <button type="submit" class="btn btn-primary" style="width: 100%;">Submit Defect Report</button>
@@ -91,8 +100,22 @@
         </div>
     </div>
 
+    <!-- QR Modal -->
+    <div id="qr-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+        <div
+            style="background: white; padding: 1rem; border-radius: 8px; width: 90%; max-width: 400px; text-align: center;">
+            <h3>Scan Asset QR Code</h3>
+            <div id="reader" style="width: 100%;"></div>
+            <button class="btn btn-link" onclick="stopQrScanner()" style="margin-top: 1rem; color: #dc3545;">Close
+                Scanner</button>
+        </div>
+    </div>
+
     <script src="js/script.js"></script>
     <script>
+        let html5QrcodeScanner = null;
+
         // Init
         document.addEventListener('DOMContentLoaded', () => {
             loadReports();
@@ -123,10 +146,9 @@
             });
         }
 
-        // Load My Reports (Currently all logs for demo)
+        // Load My Reports
         async function loadReports() {
-            // Expand Asset to get name
-            const response = await fetch('/odata/v4/repair/RepairLogs?$expand=asset');
+            const response = await fetch('/odata/v4/repair/RepairLogs?$expand=asset&$orderby=createdAt desc');
             const data = await response.json();
             const logs = data.value || [];
 
@@ -150,23 +172,91 @@
             }
         }
 
+        // Image Handling
+        function handleImageUpload(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                document.getElementById('fileName').textContent = file.name;
+
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    document.getElementById('damagePhotoBase64').value = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // QR Code Handling
+        function startQrScanner() {
+            document.getElementById('qr-modal').style.display = 'flex';
+
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess);
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            console.log(`Code matched = ${decodedText}`, decodedResult);
+
+            // Try to match dropdown
+            const select = document.getElementById('assetSelect');
+
+            // NOTE: We assume the QR code contains the Asset ID directly.
+            // If it contains a URL or other format, parsing logic goes here.
+
+            let matched = false;
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].value === decodedText) {
+                    select.selectedIndex = i;
+                    matched = true;
+                    break;
+                }
+            }
+
+            if (matched) {
+                alert("Asset identified: " + select.options[select.selectedIndex].text);
+                stopQrScanner();
+            } else {
+                alert("QR Code does not match any known asset ID: " + decodedText);
+                // Don't stop scanner, let user try again
+            }
+        }
+
+        function stopQrScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    document.getElementById('qr-modal').style.display = 'none';
+                    html5QrcodeScanner.clear();
+                }).catch(err => {
+                    console.error("Failed to stop scanner", err);
+                });
+            } else {
+                document.getElementById('qr-modal').style.display = 'none';
+            }
+        }
+
         // Submit Form
         async function submitReport(e) {
             e.preventDefault();
             const assetId = document.getElementById('assetSelect').value;
             const desc = document.getElementById('issueDesc').value;
+            const photo = document.getElementById('damagePhotoBase64').value; // Base64 string
 
             const payload = {
                 asset_ID: assetId,
                 description: desc,
-                reporter_id: "USER_001", // Mock User
+                damage_photo: photo, // Send LargeString
+                reporter_id: "USER_001",
                 ticket_status: "Pending"
             };
 
             const result = await postData('RepairLogs', payload);
             if (result) {
-                alert('Report submitted successfully!');
+                alert('Report submitted successfully! Asset status will be updated automatically.');
                 document.getElementById('reportForm').reset();
+                document.getElementById('fileName').textContent = '';
+                document.getElementById('damagePhotoBase64').value = '';
                 showListView();
             }
         }
